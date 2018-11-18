@@ -1,0 +1,80 @@
+需求：将Kafka中拉取的订单输入根据不同订单类型分别存储到HBase不同表中
+=====================================================================
+    拉取的数据为json格式，字段有：(orderType, orderId, provinceId, orderPrice, orderType, order)
+
+需求难点分析：
+=====================================================================
+    -a. JSON.parseObject(item).getString("orderType")解析订单数据得到订单类型
+    -b. 通过自定义分区器继承Partitioner并实现numPartitions方法和getPartition
+        numPartitions等于orderType的个数
+        getPartition方法中用模拟匹配match{case ...}匹配不同的orderType放入不同的分区id中
+
+代码实现：
+=================================================================
+    -a. 创建SparkConf对象，配置应用相关的信息
+    -b. 创建StreamingContext实例对象，传入SparkConf并设置批次时间
+    -c. 采用Direct方式从Kafka Topic中pull拉取订单数据
+        设置参数：metadata.broker.list，auto.offset.reset
+            val kafkaParams: Map[String, String] = Map()
+        指定Topic集合
+        KafkaUtils.createDirectStream()方法传入ssc,kafkaParams,topic三个参数拉取数据得到DStream
+    -c. 将订单数据转换成key/value对，key为orderType，value为订单数据
+        解析JSON格式字符串，获取 orderType类型
+            val orderType = JSON.parseObject(item).getString("orderType")
+        通过自定义分区器继承Partitioner并实现numPartitions方法和getPartition
+            numPartitions等于orderType的个数
+            getPartition方法中用模拟匹配match{case ...}匹配不同的orderType放入不同的分区id中
+    -d. 自定义方法，将JSON格式数据插入到HBase表中，其中表的ROWKEY为orderType（解析JSON格式获取）
+        获取HBaseConnection:val conf = HBaseConfiguration.create()
+        获取连接:val conn = ConnectionFactory.createConnection(conf)
+        获取句柄:val table: HTable = conn.getTable(TableName.valueOf(tableName)).asInstanceOf[HTable]
+        实例化Put对象:
+            import java.util
+            val puts = new util.ArrayList[Put]()
+        迭代插入:iter.foreach
+            获取JSON，获取RowKey
+                val rowKey = Bytes.toBytes(JSON.parseObject(jsonValue).getString("orderType"))
+            获取put
+                val put = new Put(rowKey)
+            添加列
+                put.addColumn(
+                     Bytes.toBytes("info"),
+                     Bytes.toBytes("value"),
+                     Bytes.toBytes(jsonValue)
+                )
+            将put加入到List中
+                puts.add(put)
+        批量插入数据到HBase表中
+        关闭连接
+
+启动服务
+=====================================================================
+    启动Hadoop服务
+        sbin/hadoop-daemon.sh start namenode
+        sbin/hadoop-daemon.sh start datanode
+    启动Zookeeper服务
+        sbin/zkServer.sh start
+    启动HBase服务
+        bin/hbase-daemon.sh start master
+        bin/hbase-daemon.sh start regionserver
+    启动Kafka服务
+        bin/kafka-server-start.sh -daemon config/server9092.properties
+        bin/kafka-server-start.sh -daemon config/server9093.properties
+        bin/kafka-server-start.sh -daemon config/server9094.properties
+
+    创建orders Topic
+        bin/kafka-topics.sh --create --zookeeper bigdata-training01.erongda.com:2181/kafka --replication-factor 2 --partitions 3 --topic orders
+
+    HBase中创建对应的四张表
+        create 'htb_alipay', 'info'
+        create 'htb_weixin', 'info'
+        create 'htb_card', 'info'
+        create 'htb_other', 'info'
+    查看HBase表中是否有数据，数据是否正确
+        scan 'htb_alipay'
+        scan 'htb_weixin'
+        scan 'htb_card'
+        scan 'htb_other'
+
+
+

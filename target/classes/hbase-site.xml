@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<?xml-stylesheet type="text/xsl" href="configuration.xsl"?>
+<configuration>
+	<!-- 指定HBase框架运行临时目录 -->
+	<property >
+		<name>hbase.tmp.dir</name>
+		<value>/opt/cdh-5.7.6/hbase-1.2.0-cdh5.7.6/data/tmp</value>
+	</property>
+
+	<!-- HBASE 表中数据存储在HDFS上根目录 -->
+	<property >
+		<name>hbase.rootdir</name>
+		<value>hdfs://bigdata-training01.erongda.com:8020/hbase</value>
+	</property>
+
+	<!-- HBase Cluster 集群运行在分布式模式下，伪分布式也是分布式 -->
+	<property >
+		<name>hbase.cluster.distributed</name>
+		<value>true</value>
+	</property>
+
+	<!-- 告知HBase Cluster所依赖的ZK Cluster地址 -->
+	<property>
+		<name>hbase.zookeeper.quorum</name>
+		<value>bigdata-training01.erongda.com</value>
+	</property>
+
+	<property >
+		<name>hbase.master.check.compression</name>
+		<value>true</value>
+	</property>
+
+	<property >
+		<name>hbase.regionserver.codecs</name>
+		<value>snappy,lz4</value>
+	</property>
+
+</configuration>
